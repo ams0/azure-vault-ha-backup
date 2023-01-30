@@ -10,4 +10,4 @@ $AzureContext = Set-AzContext -SubscriptionName $AzureContext.Subscription -Defa
 Get-AzSnapshot -ResourceGroupName ${resource_group} |  
 Where-Object TimeCreated -lt (Get-Date).AddDays(-${retention}).ToUniversalTime() |
 Where-Object {$_.Tags['createdby'] -eq "backupscript"} |
-Remove-AzSnapshot 
+Remove-AzSnapshot -Force

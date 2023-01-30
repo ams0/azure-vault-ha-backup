@@ -4,4 +4,5 @@ module "snapshot" {
   resource_group = data.azurerm_resource_group.rg.name
   tag            = var.backup_tag
   frequency      = var.frequency
+  retention      = "1"
 }

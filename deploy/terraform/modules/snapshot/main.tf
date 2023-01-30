@@ -4,16 +4,6 @@ data "azurerm_resource_group" "rg" {
 
 data "azurerm_subscription" "primary" {
 }
-
-data "local_file" "powershell" {
-  filename = "${path.module}/scripts/backup-script.ps1"
-}
-
-data "local_file" "shell" {
-  filename = "${path.module}/scripts/backup-script.sh"
-}
-
-
 resource "azurerm_role_assignment" "reader" {
   scope                = data.azurerm_subscription.primary.id
   role_definition_name = "Reader"
