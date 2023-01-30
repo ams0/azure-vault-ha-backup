@@ -2,7 +2,7 @@
 resource "azurerm_public_ip" "vault-ext" {
   count = var.public_access ? 1 : 0
 
-  name                = "vault-ext-ip"
+  name                = "PublicIPForLB"
   resource_group_name = data.azurerm_resource_group.rg.name
   location            = data.azurerm_resource_group.rg.location
   sku                 = "Standard"
@@ -54,4 +54,8 @@ resource "azurerm_lb_rule" "vault-ext" {
   frontend_ip_configuration_name = "PublicIPAddress"
   probe_id                       = azurerm_lb_probe.vaultprobe-ext[0].id
   backend_address_pool_ids       = [azurerm_lb_backend_address_pool.vaultpool-ext[0].id]
+}
+
+output "LBPublicIP" {
+  value = try(azurerm_public_ip.vault-ext[0].ip_address, null)
 }

@@ -15,3 +15,10 @@ data "azurerm_subnet" "vault" {
   virtual_network_name = data.azurerm_virtual_network.vnet.name
   resource_group_name  = var.vnetrg
 }
+
+
+data "azurerm_subnet" "db_subnet" {
+  name                 = var.db_subnet_name
+  virtual_network_name = data.azurerm_virtual_network.vnet.name
+  resource_group_name  = var.vnetrg
+}

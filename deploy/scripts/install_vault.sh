@@ -11,20 +11,13 @@ gpg --no-default-keyring --keyring /usr/share/keyrings/hashicorp-archive-keyring
 echo "deb [signed-by=/usr/share/keyrings/hashicorp-archive-keyring.gpg] https://apt.releases.hashicorp.com $(lsb_release -cs) main" | sudo tee /etc/apt/sources.list.d/hashicorp.list
 apt update > /dev/null && apt -y -qq install vault jq > /dev/null
 
-sleep 10
-printf "o\nn\np\n1\n\n\nw\n" | sudo fdisk /dev/disk/azure/scsi1/lun0
-sleep 5
-mkfs.ext4 /dev/disk/azure/scsi1/lun0-part1
-sleep 5
-mount /dev/disk/azure/scsi1/lun0-part1 /opt/vault/data/
-chown -R vault:vault /opt/vault/data
-
 echo "${cacert}" >> /opt/vault/tls/ca.crt
 echo "${cakey}" > /opt/vault/tls/ca.key
+echo "${sqlca}" > /opt/vault/tls/mysql-ca.pem
 
 #generate this server certificate using the CA+key created and injected by terraform
-openssl req -newkey rsa:2048 -nodes -keyout /opt/vault/tls/tls.key -subj "/C=CN/ST=GD/L=SZ/O=${organization}/CN=vault.${domain}" -addext "subjectAltName = DNS:vault-${environment}-${organization}.${region}.cloudapp.azure.com" -out /opt/vault/tls/tls.csr
-openssl x509 -req -extfile <(printf "subjectAltName=IP:127.0.0.1,DNS:vault.${domain},DNS:v0.${domain},DNS:v1.${domain},DNS:v2.${domain}, DNS:vault-${environment}-${organization}.${region}.cloudapp.azure.com") -days 365 -in /opt/vault/tls/tls.csr -CA /opt/vault/tls/ca.crt -CAkey /opt/vault/tls/ca.key -CAcreateserial -out /opt/vault/tls/tls.crt
+openssl req -newkey rsa:2048 -nodes -keyout /opt/vault/tls/tls.key -subj "/C=CN/ST=GD/L=SZ/O=Acme, Inc./CN=vault.dev.vault" -out /opt/vault/tls/tls.csr
+openssl x509 -req -extfile <(printf "subjectAltName=DNS:127.0.0.1,DNS:vault.dev.vault") -days 365 -in /opt/vault/tls/tls.csr -CA /opt/vault/tls/ca.crt -CAkey /opt/vault/tls/ca.key -CAcreateserial -out /opt/vault/tls/tls.crt
 
 #server cert and ca must be concatenated
 #https://developer.hashicorp.com/vault/docs/configuration/listener/tcp#tls_cert_file
@@ -35,32 +28,45 @@ chown -R vault:vault /opt/vault/tls/*
 cp /opt/vault/tls/ca.crt /usr/local/share/ca-certificates/
 update-ca-certificates
 
-cat ``> /etc/vault.d/vault.hcl <<EOF
-disable_cache           = true
-disable_mlock           = true
-ui                      = true
 
-listener "tcp" {
-   address              = "0.0.0.0:8200"
-   tls_client_ca_file   = "/opt/vault/tls/ca.pem"
-   tls_cert_file        = "/opt/vault/tls/tls.crt"
-   tls_key_file         = "/opt/vault/tls/tls.key"
-   tls_disable          = false
+#initialize the database if it's the first time
+apt-get -y -qq install mysql-client > /dev/null
+#the create user command may fail if the user exists already, please ignore
+mysql -h ${address} -u dbadmin -p"${adminpw}" -e "CREATE USER '${username}'@'$ip_address' IDENTIFIED BY '${password}'"
+mysql -h ${address} -u dbadmin -p"${adminpw}" -e "GRANT ALL PRIVILEGES ON vaultdb.* TO '${username}'@'$ip_address'"
+
+cat ``> /etc/vault.d/vault.hcl <<EOF
+ui = true
+
+#mlock = true
+disable_mlock = true
+api_addr = "https://${lb_name}"
+cluster_addr = "https://${lb_name}:8201"
+
+storage "mysql" {
+  ha_enabled = "true"
+  address    = "${address}"
+  username   = "${username}"
+  password   = "${password}"
+  database   = "${database}"
+  table      = "vault"
+  lock_table = "vault_lock"
+  plaintext_connection_allowed = "false"
+  tls_ca_file = "/opt/vault/tls/mysql-ca.pem"
 }
 
-storage "raft" {
+listener "tcp" {
+  address         = "0.0.0.0:8200"
+  tls_cert_file  = "/opt/vault/tls/tls.crt"
+  tls_key_file   = "/opt/vault/tls/tls.key"
+  telemetry {
+    unauthenticated_metrics_access = true
+  }
+}
 
-   node_id              = "${hostname}"
-   path                 = "/opt/vault/data"
-   retry_join {
-      leader_api_addr   = "https://v0.${domain}:8200"
-   }
-   retry_join {
-      leader_api_addr   = "https://v1.${domain}:8200"
-   }
-   retry_join {
-      leader_api_addr   = "https://v2.${domain}:8200"
-   }
+telemetry {
+   disable_hostname = true
+   prometheus_retention_time = "24h"
 }
 
 seal "azurekeyvault" {
@@ -68,30 +74,17 @@ seal "azurekeyvault" {
   vault_name     = "${tf_vault_name}"
   key_name       = "unsealkey"
 }
-
-cluster_addr            = "https://${hostname}.${domain}:8201"
-api_addr                = "https://vault.${domain}"
-max_lease_ttl           = "10h"
-default_lease_ttl       = "10h"
-cluster_name            = "vault"
-raw_storage_endpoint    = true
-disable_sealwrap        = true
-disable_printable_check = true
 EOF
-
-
 
 #Start vault
 systemctl start vault
 systemctl enable vault
 
-# export VAULT_ADDR=https://${vault_internal_lb}
-# export VAULT_SKIP_VERIFY=1
+export VAULT_ADDR=https://${vault_internal_lb}
+export VAULT_SKIP_VERIFY=1
 
 #init vault
-if [ $(hostname) = "v0" ]; then
-  VAULT_TOKEN="$(vault operator init | grep "Initial Root Token: " | awk '{print $4}')"
-fi
+VAULT_TOKEN="$(vault operator init | grep "Initial Root Token: " | awk '{print $4}')"
 
 #upload the Vault root token to Azure Keyvault
 token=$(curl -s 'http://169.254.169.254/metadata/identity/oauth2/token?api-version=2018-02-01&resource=https%3A%2F%2Fvault.azure.net' -H Metadata:true | awk -F"[{,\":}]" '{print $6}')
@@ -101,7 +94,7 @@ token=$(curl -s 'http://169.254.169.254/metadata/identity/oauth2/token?api-versi
     -H "Authorization: Bearer $${token}" \
     --data-ascii "{'value': '$${VAULT_TOKEN}'}" \
     -H "Content-type: application/json"
-echo $${VAULT_TOKEN} >>  ~/.vault-token
+
 vault status
 
 # Hardening https://developer.hashicorp.com/vault/tutorials/operations/production-hardening
@@ -109,15 +102,11 @@ vault status
 chmod 0640 /etc/vault.d/
 
 #enable audit logs
-if [ $(hostname) = "v0" ]; then
-vault audit enable file file_path=/opt/vault/vault_audit.log
-fi
+vault audit enable file file_path=/var/log/vault_audit.log
 
 #enable Github Auth method and map a github team to the admin policy
 
-if [ $(hostname) = "v0" ]; then
 
-echo $VAULT_TOKEN
 tee admin-policy.hcl <<EOF
 # Read system health check
 path "sys/health"
@@ -159,15 +148,10 @@ path "sys/auth"
   capabilities = ["read"]
 }
 
-# Work with pki secrets engine
-path "pki*" {
-  capabilities = [ "create", "read", "update", "delete", "list", "sudo" ]
-}
-
 # Enable and manage the key/value secrets engine at `secret/` path
 
 # List, create, update, and delete key/value secrets
-path "secrets/*"
+path "secret/*"
 {
   capabilities = ["create", "read", "update", "delete", "list", "sudo"]
 }
@@ -188,4 +172,3 @@ vault policy write admin admin-policy.hcl
 vault auth enable github
 vault write auth/github/config organization=${github_org}
 vault write auth/github/map/teams/${github_admin_team} value=admin
-fi

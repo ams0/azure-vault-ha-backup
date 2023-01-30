@@ -80,12 +80,25 @@ variable "subnet_name" {
   description = "The subnet for the vault, must have the Microsoft.DBforMySQL/flexibleServers delegation"
 }
 
-variable "vm_username" {
-  description = "VM username"
+variable "db_subnet_name" {
+  description = "The subnet for the vault, must have the Microsoft.DBforMySQL/flexibleServers delegation"
 }
 
+variable "vmss_username" {
+  description = "VMSS username"
+}
+
+variable "dbadminusername" {
+  description = "DB username"
+}
+variable "vaultdbname" {
+  description = "Name for the Vault database"
+}
+variable "vaultdbdminusername" {
+  description = "Username for the vault user on the vault database"
+}
 variable "vault_replicas" {
-  description = "VM replicas"
+  description = "VMSS replicas"
 }
 
 variable "first_public_key" {
@@ -103,16 +116,6 @@ variable "public_access" {
 variable "backup" {
   description = "Switch for backup"
 }
-
-variable "backup_tag" {
-  description = "Tag for marking disks for backup"
-}
-
-variable "frequency" {
-  description = "Backup Frequency"
-  default     = "Daily"
-}
-
 variable "github_org" {
   description = "The Github org allowed to login in Vault"
 }

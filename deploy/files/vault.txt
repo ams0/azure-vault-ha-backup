@@ -1,9 +1,0 @@
-Now add a Keyvault policy for your user on the kv_name to read the Vault token
-
-
-az keyvault set-policy --secret-permissions get list --upn "alessandro_lovelace.nl#EXT#@LovelaceEngineeringBV.onmicrosoft.com" -n kv_name
-VAULT_TOKEN=$(az keyvault secret show --name vaulttoken --vault-name kv_name  -o tsv --query 'value')
-
-export VAULT_ADDR="https://vault-dev-lovelace.westeurope.cloudapp.azure.com"
-export VAULT_SKIP_VERIFY=1
-vault status
