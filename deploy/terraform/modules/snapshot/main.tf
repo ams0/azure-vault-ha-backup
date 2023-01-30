@@ -77,8 +77,8 @@ resource "azurerm_automation_runbook" "vault-disk-backup" {
 }
 
 
-resource "azurerm_automation_runbook" "vault-disk-backup" {
-  name                    = "vault-disk-backup"
+resource "azurerm_automation_runbook" "vault-disk-snapshot-deleter" {
+  name                    = "vault-disk-snapshot-deleter"
   location                = data.azurerm_resource_group.rg.location
   resource_group_name     = data.azurerm_resource_group.rg.name
   automation_account_name = azurerm_automation_account.vault-disk-backup.name
