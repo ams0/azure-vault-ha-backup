@@ -1,0 +1,11 @@
+version: "3.7"
+
+services:
+  cli:
+    image: docker.pkg.github.com/sede-x/dsx-monorepo/az-terraform-cli:0.22.0
+    volumes:
+      - ~/.azure:/root/.azure
+      - ~/.kube:/root/.kube
+      - .:/usr/src/app
+    working_dir: /usr/src/app/deploy
+    entrypoint: /bin/bash

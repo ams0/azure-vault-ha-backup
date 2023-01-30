@@ -1,0 +1,7 @@
+storage_account_name = "lovelace"
+# export ARM_ACCESS_KEY= is necessary too
+# Also, you need AZURE_TENANT_ID, AZURE_SUBSCRIPTION_ID, AZURE_CLIENT_ID and AZURE_CLIENT_SECRET defined and exported
+# then apply TO YOUR LOCAL SUBSCRIPTION
+# tf init -backend-config=local.hcl --reconfigure
+# tf plan --var-file=common.tfvars --var-file=local.tfvars
+# tf apply -auto-approve --var-file=common.tfvars --var-file=local.tfvars

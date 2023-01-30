@@ -1,0 +1,8 @@
+{
+  "name": "@dsx/infra-vault",
+  "version": "0.1.0",
+  "description": "Hashicorp Vault deployment.",
+  "scripts": {
+    "cli": "docker-compose -f docker-compose.cli.yml run --rm cli"
+  }
+}
