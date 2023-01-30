@@ -70,22 +70,27 @@ resource "azurerm_automation_runbook" "vault-disk-backup" {
 
   content = templatefile("${path.module}/scripts/backup-script.ps1", { resource_group = "${data.azurerm_resource_group.rg.name}", tag = "${var.tag}" })
 
-
+  #this needs to be here because of this bug https://github.com/hashicorp/terraform-provider-azurerm/issues/4851
   publish_content_link {
     uri = "https://raw.githubusercontent.com/Azure/azure-quickstart-templates/c4935ffb69246a6058eb24f54640f53f69d3ac9f/101-automation-runbook-getvms/Runbooks/Get-AzureVMTutorial.ps1"
   }
 }
 
-resource "azurerm_automation_runbook" "vault-disk-backup-script" {
-  name                    = "vault-disk-backup-script"
+
+resource "azurerm_automation_runbook" "vault-disk-backup" {
+  name                    = "vault-disk-backup"
   location                = data.azurerm_resource_group.rg.location
   resource_group_name     = data.azurerm_resource_group.rg.name
   automation_account_name = azurerm_automation_account.vault-disk-backup.name
   log_verbose             = "true"
   log_progress            = "true"
   description             = "This is an example runbook"
-  runbook_type            = "Script"
+  runbook_type            = "PowerShell"
 
-  content = data.local_file.shell.content
+  content = templatefile("${path.module}/scripts/delete-snapshot.ps1", { resource_group = "${data.azurerm_resource_group.rg.name}", retention = "${var.retention}" })
 
+  #this needs to be here because of this bug https://github.com/hashicorp/terraform-provider-azurerm/issues/4851
+  publish_content_link {
+    uri = "https://raw.githubusercontent.com/Azure/azure-quickstart-templates/c4935ffb69246a6058eb24f54640f53f69d3ac9f/101-automation-runbook-getvms/Runbooks/Get-AzureVMTutorial.ps1"
+  }
 }
