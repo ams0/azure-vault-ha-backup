@@ -105,8 +105,8 @@ resource "azurerm_network_interface_backend_address_pool_association" "backendva
 }
 
 resource "azurerm_network_interface_backend_address_pool_association" "backendvault-external" {
-  count                   = var.vault_replicas
-  network_interface_id    = azurerm_network_interface.vaultnic[count.index].id
+  count                   = var.public_access ? 1 : 0
+  network_interface_id    = azurerm_network_interface.vaultnic[var.vault_replicas.index].id
   ip_configuration_name   = "internal"
   backend_address_pool_id = azurerm_lb_backend_address_pool.vaultpool-ext[0].id
 }
